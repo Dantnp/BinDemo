@@ -74,7 +74,7 @@ public class BinanceService {
             })
         );
 
-    return filterAndSort(calculateCombs(coins, bookPriceMap));
+    return calculateCombs(coins, bookPriceMap);
   }
 
   private Map<String, Double> calculateCombs(Set<String> coins, Map<String, JsonNode> bookPriceMap) {
@@ -102,7 +102,7 @@ public class BinanceService {
         combMap.put(coin + "USDT - BTCUSDT - " + coin + "BTC", comb3);
       }
     });
-    return combMap;
+    return filterAndSort(combMap);
   }
 
   private Map<String, Double> filterAndSort(Map<String, Double> combMap) {
