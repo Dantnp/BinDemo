@@ -35,19 +35,19 @@ public class RestTemplateService {
     this.restTemplate = restTemplate;
   }
 
-  public Optional<HttpEntity<String>> get(User user, String path, String data) {
-    return call(HttpMethod.GET, user, path, data);
+  public Optional<HttpEntity<String>> get(String path, String data) {
+    return call(HttpMethod.GET, path, data);
   }
 
-  public Optional<HttpEntity<String>> post(User user, String path, String data) {
-    return call(HttpMethod.POST, user, path, data);
+  public Optional<HttpEntity<String>> post(String path, String data) {
+    return call(HttpMethod.POST, path, data);
   }
 
-  public Optional<HttpEntity<String>> delete(User user, String path, String data) {
-    return call(HttpMethod.DELETE, user, path, data);
+  public Optional<HttpEntity<String>> delete(String path, String data) {
+    return call(HttpMethod.DELETE, path, data);
   }
 
-  private Optional<HttpEntity<String>> call(HttpMethod method, User user, String path, String data) {
+  private Optional<HttpEntity<String>> call(HttpMethod method, String path, String data) {
     try {
 //      String signature = calculateSignature(user, method, path, data);
       String url = "https://api.binance.com" + path + data;

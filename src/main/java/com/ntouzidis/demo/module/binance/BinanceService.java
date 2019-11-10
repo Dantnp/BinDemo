@@ -3,18 +3,16 @@ package com.ntouzidis.demo.module.binance;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.common.collect.ImmutableList;
 import com.ntouzidis.demo.module.common.Context;
-import com.ntouzidis.demo.module.user.entity.User;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
-import static org.springframework.data.util.Pair.toMap;
+import static java.util.Spliterators.spliteratorUnknownSize;
 
 @Service
 public class BinanceService {
@@ -33,21 +31,19 @@ public class BinanceService {
   }
 
   public String readPrice(String symbol) {
-    User user = context.getUser();
     String data = "";
     if (symbol != null)
       data = "?symbol=" + symbol;
-    return restTemplateService.get(user, SYMBOL_PRICE_TICKER, data)
+    return restTemplateService.get(SYMBOL_PRICE_TICKER, data)
         .orElseThrow(RuntimeException::new)
         .getBody();
   }
 
   public String readBookPrice(String symbol) {
-    User user = context.getUser();
     String data = "";
     if (symbol != null)
       data = "?symbol=" + symbol;
-    return restTemplateService.get(user, SYMBOL_BOOK_TICKER, data)
+    return restTemplateService.get(SYMBOL_BOOK_TICKER, data)
         .orElseThrow(RuntimeException::new)
         .getBody();
   }
@@ -59,54 +55,68 @@ public class BinanceService {
     try {
       bookPrices = (ArrayNode) mapper.readTree(bookPriceResponse);
     } catch (IOException e) {
-      e.printStackTrace();
     }
+
+    List<String> baseCoins = ImmutableList.of("BTC", "ETH", "BNB", "USDT");
     Map<String, JsonNode> bookPriceMap = new HashMap<>();
 
-    StreamSupport.stream(Spliterators
-        .spliteratorUnknownSize(bookPrices.elements(),
-            Spliterator.ORDERED), false)
+    StreamSupport.stream(spliteratorUnknownSize(bookPrices.elements(), Spliterator.ORDERED), true)
         .forEach(i -> bookPriceMap.put(i.get("symbol").textValue(), i));
 
-    JsonNode ADABTC = bookPriceMap.get("ADABTC");
-    JsonNode ADAETH= bookPriceMap.get("ADAETH");
-    JsonNode ETHBTC= bookPriceMap.get("ETHBTC");
+    Set<String> coins = new HashSet<>();
+    bookPriceMap.entrySet().stream()
+        .filter(i -> baseCoins.stream().anyMatch(i.getKey()::contains))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+        .forEach((k, v) ->
+            baseCoins.forEach(i -> {
+              if (k.contains(i))
+                coins.add(k.replace(i, ""));
+            })
+        );
 
-    JsonNode ADABNB = bookPriceMap.get("ADABNB");
-    JsonNode BNBBTC = bookPriceMap.get("BNBBTC");
-    JsonNode ADAUSDT = bookPriceMap.get("ADAUSDT");
-    JsonNode BTCUSDT = bookPriceMap.get("BTCUSDT");
+    return filterAndSort(calculateCombs(coins, bookPriceMap));
+  }
 
-    Map<String, JsonNode> bookPriceToCalculate = new HashMap<>(bookPriceMap);
-//    bookPriceToCalculate.remove();
-
-
-
+  private Map<String, Double> calculateCombs(Set<String> coins, Map<String, JsonNode> bookPriceMap) {
     Map<String, Double> combMap = new HashMap<>();
-    Double comb1 = ADAETH.get("bidPrice").asDouble( )* ETHBTC.get("bidPrice").asDouble() / ADABTC.get("askPrice").asDouble();
-    combMap.put("ADAETH - ETHBTC - ADABTC", comb1);
+    coins.forEach(coin -> {
+      JsonNode ETHBTC = bookPriceMap.get("ETHBTC");
+      JsonNode BNBBTC = bookPriceMap.get("BNBBTC");
+      JsonNode BTCUSDT = bookPriceMap.get("BTCUSDT");
 
-    Double comb2 = ADABNB.get("bidPrice").asDouble( )* BNBBTC.get("bidPrice").asDouble() / ADABTC.get("askPrice").asDouble();
-    combMap.put("ADABNB - BNBBTC - ADABTC", comb2);
+      JsonNode _ETH = bookPriceMap.get(coin + "ETH");
+      JsonNode _BNB = bookPriceMap.get(coin + "BNB");
+      JsonNode _USDT = bookPriceMap.get(coin + "USDT");
+      JsonNode _BTC = bookPriceMap.get(coin + "BTC");
 
-    Double comb3 = ADAUSDT.get("bidPrice").asDouble( )* BTCUSDT.get("askPrice").asDouble() / ADABTC.get("askPrice").asDouble();
-    combMap.put("ADAUSDT - BTCUSDT - ADABTC", comb3);
-
-//    bookPriceMap.forEach((k, v) -> calculateCombs(k, v, combMap));
-
+      if (_ETH != null && ETHBTC != null && _BTC != null) {
+        Double comb1 = _ETH.get("bidPrice").asDouble( ) * ETHBTC.get("bidPrice").asDouble() / _BTC.get("askPrice").asDouble();
+        combMap.put(coin + "ETH - ETHBTC - " + coin + "BTC", comb1);
+      }
+      if (_BNB != null && BNBBTC != null && _BTC != null) {
+        Double comb2 = _BNB.get("bidPrice").asDouble() * BNBBTC.get("bidPrice").asDouble() / _BTC.get("askPrice").asDouble();
+        combMap.put(coin + "BNB - BNBBTC - " + coin + "BTC", comb2);
+      }
+      if (_USDT != null && BTCUSDT != null && _BTC != null) {
+        Double comb3 = _USDT.get("bidPrice").asDouble( ) * BTCUSDT.get("askPrice").asDouble() / _BTC.get("askPrice").asDouble();
+        combMap.put(coin + "USDT - BTCUSDT - " + coin + "BTC", comb3);
+      }
+    });
     return combMap;
   }
 
-  private void calculateCombs(String symbol, JsonNode jsonNode, Map<String, Double> combMap) {
-
-    Double comb1 = ADAETH.get("bidPrice").asDouble( )* ETHBTC.get("bidPrice").asDouble() / ADABTC.get("askPrice").asDouble();
-    combMap.put("ADAETH - ETHBTC - ADABTC", comb1);
-
-    Double comb2 = ADABNB.get("bidPrice").asDouble( )* BNBBTC.get("bidPrice").asDouble() / ADABTC.get("askPrice").asDouble();
-    combMap.put("ADABNB - BNBBTC - ADABTC", comb2);
-
-    Double comb3 = ADAUSDT.get("bidPrice").asDouble( )* BTCUSDT.get("askPrice").asDouble() / ADABTC.get("askPrice").asDouble();
-    combMap.put("ADAUSDT - BTCUSDT - ADABTC", comb3);
+  private Map<String, Double> filterAndSort(Map<String, Double> combMap) {
+    return combMap.entrySet()
+        .stream()
+        .filter(i -> i.getValue() > 0)
+        .filter(i -> i.getValue() < 2)
+        .sorted((x1, x2) -> x2.getValue().compareTo(x1.getValue()))
+        .collect(Collectors.toMap(
+            Map.Entry::getKey,
+            Map.Entry::getValue,
+            (oldValue, newValue) -> oldValue,
+            LinkedHashMap::new)
+        );
   }
 
 
