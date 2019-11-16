@@ -48,7 +48,7 @@ public class BinanceApiV1Controller {
   public ResponseEntity<Map<String, Double>> getDiff(
       @RequestParam(value = "symbol", required = false) String symbol
   ) {
-    Map<String, Double> bookPrice = binanceService.getdiff();
+    Map<String, Double> bookPrice = binanceService.getCombinations();
     return new ResponseEntity(bookPrice, HttpStatus.OK);
   }
 

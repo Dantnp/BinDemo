@@ -48,7 +48,7 @@ public class BinanceService {
         .getBody();
   }
 
-  public Map<String, Double> getdiff() {
+  public Map<String, Double> getCombinations() {
     readBookPrice(null);
     String bookPriceResponse = readBookPrice(null);
     ArrayNode bookPrices = mapper.createArrayNode();
@@ -98,7 +98,7 @@ public class BinanceService {
         combMap.put(coin + "BNB - BNBBTC - " + coin + "BTC", comb2);
       }
       if (_USDT != null && BTCUSDT != null && _BTC != null) {
-        Double comb3 =_BTC.get("bidPrice").asDouble()/ _USDT.get("bidPrice").asDouble( ) * BTCUSDT.get("askPrice").asDouble() ;
+        Double comb3 =_BTC.get("bidPrice").asDouble() * BTCUSDT.get("askPrice").asDouble() / _USDT.get("bidPrice").asDouble();
         combMap.put(coin + "USDT - BTCUSDT - " + coin + "BTC", comb3);
       }
     });
